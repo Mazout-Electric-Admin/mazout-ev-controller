@@ -1,0 +1,4 @@
+../Core/Src/Network.c:22:6:NetworkInit	16	static
+../Core/Src/Network.c:92:6:OpenSocket	16	static
+../Core/Src/Network.c:112:6:SocketSendData	48	static
+../Core/Src/Network.c:138:6:SocketReceiveData	16	static

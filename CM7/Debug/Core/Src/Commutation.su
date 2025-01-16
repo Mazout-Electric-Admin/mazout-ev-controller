@@ -1,0 +1,3 @@
+../Core/Src/Commutation.c:85:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/Commutation.c:110:6:SetCommutationStep	16	static
+../Core/Src/Commutation.c:191:6:threeSine	16	static
