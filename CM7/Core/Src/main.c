@@ -42,6 +42,7 @@
 #endif
 
 #define RX_BUFFER_SIZE 256
+#define TX_BUFFER_SIZE	256
 #define UART_TIMEOUT 100
 #define PACKET_MIN_LENGTH 6
 #define SERVER_IP "13.233.25.158"
@@ -101,9 +102,9 @@ const osMutexAttr_t uart_lock_attributes = {
   .name = "uart_lock"
 };
 /* USER CODE BEGIN PV */
-char txBuffer[RX_BUFFER_SIZE];        // Buffer for sending AT commands
+char txBuffer[TX_BUFFER_SIZE];        // Buffer for sending AT commands
 char rxBuffer[RX_BUFFER_SIZE];        // Buffer for receiving AT responses
-char checkBuffer[RX_BUFFER_SIZE];
+char checkBuffer[TX_BUFFER_SIZE];
 
 uint16_t writeIndex = 0;  // Updated by DMA
 uint16_t readIndex = 0;   // Updated by application
@@ -648,7 +649,7 @@ void NetworkInit() {
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"gnssconfig\",0\r\n");
+	strcpy(txBuffer, "AT+QGPSCFG=\"gnssconfig\",1\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -664,7 +665,7 @@ void NetworkInit() {
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"gpsnmeatype\",0\r\n");
+	strcpy(txBuffer, "AT+QGPSCFG=\"gpsnmeatype\",4\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -752,6 +753,8 @@ void OpenSocket() {
 void SocketSendData(void) {
 	uint8_t data[40];
 
+	memset(data, '\0', sizeof(data));
+
 	encodeServerData(propertyIndex, data);
 
 	osMutexAcquire(uart_lockHandle, osWaitForever);
@@ -767,8 +770,11 @@ void SocketSendData(void) {
     memset(txBuffer, '\0' , sizeof(txBuffer));
 
     // Send data
-   // HAL_UART_Transmit(&huart1, (uint8_t *)data, sizeof(data), UART_TIMEOUT);
-   // memset(txBuffer, '\0' , sizeof(txBuffer));
+    //memset(txBuffer, (uint8_t *)data, sizeof(data));
+    memcpy(txBuffer, (uint8_t *)data, sizeof(data));
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+    memset(txBuffer, '\0' , sizeof(txBuffer));
 
     osMutexRelease(uart_lockHandle);
 
@@ -783,7 +789,7 @@ void SocketReceiveData(void) {
 
 	osMutexAcquire(uart_lockHandle, osWaitForever);
 
-    sprintf(txBuffer, "AT+QIRD=0,%d,%d\r\n", SOCKET_INDEX, length);
+    sprintf(txBuffer, "AT+QIRD=%d,%d\r\n", SOCKET_INDEX, length);
 
     HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
     memset(txBuffer, '\0' , sizeof(txBuffer));
@@ -800,12 +806,13 @@ void gps(void) {
 	char *gpsString;
 	osMutexAcquire(uart_lockHandle, osWaitForever);
 
-	strcpy(txBuffer, "AT+QGPSLOC=2\r\n");
+	strcpy(txBuffer, "AT+QGPSLOC=0\r\n");
 
 	while (!strstr((char *)checkBuffer, "GPGSV")) {
 
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	osDelay(10);  // Wait for the response
+
 	}
 
 	gpsString = strstr((char *)checkBuffer, "GPGSV");
@@ -837,7 +844,7 @@ void HandleReceivedData(uint8_t writeIndex) {
 	uint16_t newDataCount = (writeIndex >= readIndex)
 	                            ? (writeIndex - readIndex)
 	                            : (RX_BUFFER_SIZE - readIndex + writeIndex);
-	memset(checkBuffer, '\0', RX_BUFFER_SIZE);
+	memset(checkBuffer, '\0', TX_BUFFER_SIZE);
 	for (uint16_t i = 0; i < newDataCount; i++) {
 		// Copy new data to the process buffer
 		uint8_t newByte = rxBuffer[readIndex];
@@ -1049,7 +1056,7 @@ void StartGpsTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	gps();
+	//gps();
     osDelay(20);
   }
   /* USER CODE END StartGpsTask */
