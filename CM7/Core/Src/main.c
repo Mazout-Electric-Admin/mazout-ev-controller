@@ -45,7 +45,7 @@
 #define TX_BUFFER_SIZE	256
 #define UART_TIMEOUT 100
 #define PACKET_MIN_LENGTH 6
-#define SERVER_IP "13.233.25.158"
+#define SERVER_IP "13.232.19.209"
 #define SERVER_PORT 3050
 #define SOCKET_INDEX 0
 
@@ -109,16 +109,23 @@ char checkBuffer[TX_BUFFER_SIZE];
 uint16_t writeIndex = 0;  // Updated by DMA
 uint16_t readIndex = 0;   // Updated by application
 uint8_t propertyIndex = 0;
+uint8_t c_type = 0;
+char *gpsString;
+char extractedData[32] = {0};
 
 typedef enum {
     IMMOBILIZE_STATUS = 0x01,
     RPM_PRESET        = 0x02,
     GPS               = 0x03,
-    CURRENT           = 0x04,
-    VOLTAGE           = 0x05,
+    BUS_CURRENT       = 0x04,
+    BUS_VOLTAGE       = 0x05,
     RPM               = 0x06,
-    TEMPERATURE       = 0x07,
-    NETWORK_STRENGTH  = 0x08
+    DEVICE_TEMP       = 0x07,
+    NETWORK_STRENGTH  = 0x08,
+	TORQUE			  = 0x09,
+	SOC				  = 0x0A,
+	THROTTLE		  = 0x0B,
+	MOTOR_TEMP 		  = 0x0C,
 } ServerPropertyType;
 
 
@@ -128,8 +135,12 @@ typedef struct {
     uint8_t gpsData[32];          // 6 bytes
     uint8_t currentData[2];      // 2 bytes
     uint8_t voltageData[2];      // 2 bytes
-    uint8_t rpm[1];              // 1 byte
-    uint8_t temperature[1];      // 1 byte
+    uint8_t rpm[2];              // 1 byte
+    uint8_t device_temp[1];      // 1 byte
+    uint8_t motor_temp[1];
+    uint8_t torque[1];
+    uint8_t soc[1];
+    uint8_t throttle[2];
     uint8_t networkStrength[1];  // 1 byte
 } serverProperties;
 
@@ -231,16 +242,22 @@ Error_Handler();
   // Open a socket
   OpenSocket();
 
-  serverAttributes.immobilizeStatus[0] = 0x01;
-  serverAttributes.rpmPreset[0] = 0x64;
+  //serverAttributes.immobilizeStatus[0] = 0x01;
+  //serverAttributes.rpmPreset[0] = 0x64;
   memset(serverAttributes.gpsData, 0x00, sizeof(serverAttributes.gpsData));
   serverAttributes.currentData[0] = 0x12;
   serverAttributes.currentData[1] = 0x34;
   serverAttributes.voltageData[0] = 0x56;
   serverAttributes.voltageData[1] = 0x78;
-  serverAttributes.rpm[0] = 0x32;
-  serverAttributes.temperature[0] = 0x20;
+  serverAttributes.rpm[0] = 0x01;
+  serverAttributes.rpm[1] = 0xF4;
+  serverAttributes.motor_temp[0] = 0x20;
+  serverAttributes.device_temp[0] = 0x20;
   serverAttributes.networkStrength[0] = 0x05;
+  serverAttributes.soc[0] = 0x63;
+  serverAttributes.torque[0] = 0x00;
+  serverAttributes.throttle[0] = 0x01;
+  serverAttributes.throttle[1] = 0x05;
 
   /* USER CODE END 2 */
 
@@ -633,7 +650,7 @@ void NetworkInit() {
     HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
     // PDP Contextn
-	strcpy(txBuffer, "AT+QIACT=1\r\n");
+    strcpy(txBuffer, "AT+QIACT=1\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -649,7 +666,7 @@ void NetworkInit() {
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"gnssconfig\",1\r\n");
+	strcpy(txBuffer, "AT+QGPSCFG=\"gnssconfig\",3\r\n");//3
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -657,7 +674,7 @@ void NetworkInit() {
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"autogps\",1\r\n");
+	strcpy(txBuffer, "AT+QGPSCFG=\"autogps\",0\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -665,7 +682,7 @@ void NetworkInit() {
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"gpsnmeatype\",4\r\n");
+	strcpy(txBuffer, "AT+QGPSCFG=\"gpsnmeatype\",0\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -705,7 +722,7 @@ void NetworkInit() {
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"gnssnmeatype\",0\r\n");
+	strcpy(txBuffer, "AT+QGPSCFG=\"gnssnmeatype\",2\r\n");//1
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -749,6 +766,41 @@ void OpenSocket() {
     //__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
 }
 
+void device_config(int type)
+{
+	if(type == 1)
+	{
+	  serverAttributes.currentData[0] = 0x01;
+	  serverAttributes.currentData[1] = 0x34;
+	  serverAttributes.voltageData[0] = 0x30;
+	  serverAttributes.voltageData[1] = 0x12;
+	  serverAttributes.rpm[0] = 0x1;
+	  serverAttributes.rpm[1] = 0xF4;
+	  serverAttributes.motor_temp[0] = 0x20;
+	  serverAttributes.device_temp[0] = 0x20;
+	  serverAttributes.networkStrength[0] = 0x0d;
+	  serverAttributes.soc[0] = 0x54;
+	  serverAttributes.torque[0] = 0x50;
+	  serverAttributes.throttle[0] = 0x03;
+	  serverAttributes.throttle[1] = 0x08;
+	}
+	else if(type == 2)
+	{
+	  serverAttributes.currentData[0] = 0x03;
+	  serverAttributes.currentData[1] = 0x55;
+	  serverAttributes.voltageData[0] = 0x28;
+	  serverAttributes.voltageData[1] = 0x39;
+	  serverAttributes.rpm[0] = 0x8;
+	  serverAttributes.rpm[1] = 0xE8;
+	  serverAttributes.motor_temp[0] = 0x21;
+	  serverAttributes.device_temp[0] = 0x21;
+	  serverAttributes.networkStrength[0] = 0x0f;
+	  serverAttributes.soc[0] = 0x4E;
+	  serverAttributes.torque[0] = 0x64;
+	  serverAttributes.throttle[0] = 0x04;
+	  serverAttributes.throttle[1] = 0x02;
+	}
+}
 
 void SocketSendData(void) {
 	uint8_t data[40];
@@ -765,7 +817,7 @@ void SocketSendData(void) {
     while (!strstr((char *)checkBuffer, ">")) {
 
     	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-    	osDelay(10);  // Wait for the response
+    	osDelay(5);  // Wait for the response
     }
     memset(txBuffer, '\0' , sizeof(txBuffer));
 
@@ -781,7 +833,8 @@ void SocketSendData(void) {
     if (strstr(rxBuffer, "SEND OK") == NULL) {
         //Error_Handler();
     }
-    if(++propertyIndex > 8)	propertyIndex  = 0;
+    if(++propertyIndex > 14)	propertyIndex  = 0;
+    device_config(c_type);
 }
 
 void SocketReceiveData(void) {
@@ -803,38 +856,40 @@ void SocketReceiveData(void) {
 }
 
 void gps(void) {
-	char *gpsString;
+
+
 	osMutexAcquire(uart_lockHandle, osWaitForever);
 
-	strcpy(txBuffer, "AT+QGPSLOC=0\r\n");
-
-	while (!strstr((char *)checkBuffer, "GPGSV")) {
-
+	strcpy(txBuffer, "AT+QGPS=1\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-	osDelay(10);  // Wait for the response
+	memset(txBuffer, '\0' , sizeof(txBuffer));
 
+	strcpy(txBuffer, "AT+QGPSLOC=2\r\n");
+
+	while (1) {
+		// Transmit the location request
+		HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+		//osDelay(5); // Wait for the response
+
+		// Check if the response contains "GNGGA"
+		gpsString = strstr((char *)checkBuffer, "GNRMC");
+		if (gpsString != NULL) break;
 	}
 
-	gpsString = strstr((char *)checkBuffer, "GPGSV");
+	gpsString = strstr(gpsString, "GNRMC");
+	gpsString = strstr(gpsString, "A");
+	gpsString = strstr(gpsString, ",");
+	//gpsString += 2;
+	strncpy(extractedData, gpsString, 28);
+	extractedData[32] = '\0';
 
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
-	// Move pointer past "+CGPSINFO:"
-	gpsString += 10;
+	memcpy(serverAttributes.gpsData, extractedData, strlen(extractedData));
 
-	// Example response: 3113.343286,N,12121.234064,E,...
-	char latitude[16] = {0};
-	char longitude[16] = {0};
-
-	// Extract latitude and longitude strings
-	char *token = strtok(gpsString, ",");
-	if (token != NULL) strncpy(latitude, token, sizeof(latitude) - 1);
-	token = strtok(NULL, ","); // Skip N/S indicator
-	token = strtok(NULL, ",");
-	if (token != NULL) strncpy(longitude, token, sizeof(longitude) - 1);
-
-	// Format and store in gpsData
-	sprintf((char *)serverAttributes.gpsData, "%s,%s", latitude, longitude);
+	strcpy(txBuffer, "AT+QGPSEND\r\n");
+	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+	memset(txBuffer, '\0' , sizeof(txBuffer));
 
 	osMutexRelease(uart_lockHandle);
 }
@@ -879,11 +934,11 @@ uint8_t encodeServerData(ServerPropertyType type, uint8_t *packet) {
             payload = serverAttributes.gpsData;
             payloadLength = sizeof(serverAttributes.gpsData);
             break;
-        case CURRENT:
+        case BUS_CURRENT:
             payload = serverAttributes.currentData;
             payloadLength = sizeof(serverAttributes.currentData);
             break;
-        case VOLTAGE:
+        case BUS_VOLTAGE:
             payload = serverAttributes.voltageData;
             payloadLength = sizeof(serverAttributes.voltageData);
             break;
@@ -891,14 +946,30 @@ uint8_t encodeServerData(ServerPropertyType type, uint8_t *packet) {
             payload = serverAttributes.rpm;
             payloadLength = sizeof(serverAttributes.rpm);
             break;
-        case TEMPERATURE:
-            payload = serverAttributes.temperature;
-            payloadLength = sizeof(serverAttributes.temperature);
+        case DEVICE_TEMP:
+            payload = serverAttributes.device_temp;
+            payloadLength = sizeof(serverAttributes.device_temp);
             break;
         case NETWORK_STRENGTH:
             payload = serverAttributes.networkStrength;
             payloadLength = sizeof(serverAttributes.networkStrength);
             break;
+        case TORQUE:
+			payload = serverAttributes.torque;
+			payloadLength = sizeof(serverAttributes.torque);
+			break;
+        case SOC:
+			payload = serverAttributes.soc;
+			payloadLength = sizeof(serverAttributes.soc);
+			break;
+        case MOTOR_TEMP:
+			payload = serverAttributes.motor_temp;
+			payloadLength = sizeof(serverAttributes.motor_temp);
+			break;
+        case THROTTLE:
+			payload = serverAttributes.throttle;
+			payloadLength = sizeof(serverAttributes.throttle);
+			break;
         default:
             return 0; // Unknown type
     }
@@ -955,21 +1026,33 @@ void decodeServerData(uint8_t *packet, uint8_t length) {
         case GPS:
             memcpy(serverAttributes.gpsData, payload, payloadLength);
             break;
-        case CURRENT:
+        case BUS_CURRENT:
             memcpy(serverAttributes.currentData, payload, payloadLength);
             break;
-        case VOLTAGE:
+        case BUS_VOLTAGE:
             memcpy(serverAttributes.voltageData, payload, payloadLength);
             break;
         case RPM:
             memcpy(serverAttributes.rpm, payload, payloadLength);
             break;
-        case TEMPERATURE:
-            memcpy(serverAttributes.temperature, payload, payloadLength);
+        case DEVICE_TEMP:
+            memcpy(serverAttributes.device_temp, payload, payloadLength);
             break;
+        case MOTOR_TEMP:
+			memcpy(serverAttributes.motor_temp, payload, payloadLength);
+			break;
         case NETWORK_STRENGTH:
             memcpy(serverAttributes.networkStrength, payload, payloadLength);
             break;
+        case TORQUE:
+			memcpy(serverAttributes.torque, payload, payloadLength);
+			break;
+        case SOC:
+			memcpy(serverAttributes.soc, payload, payloadLength);
+			break;
+        case THROTTLE:
+			memcpy(serverAttributes.throttle, payload, payloadLength);
+			break;
         default:
             // Unknown type
             break;
@@ -1018,8 +1101,8 @@ void StartSendTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  SocketSendData();
-	  osDelay(20);
+	  //SocketSendData();
+	  osDelay(1);
   }
   /* USER CODE END StartSendTask */
 }
@@ -1037,8 +1120,8 @@ void StartReceiveTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  SocketReceiveData();
-	  osDelay(20);
+	  //SocketReceiveData();
+	  osDelay(1);
   }
   /* USER CODE END StartReceiveTask */
 }
@@ -1056,8 +1139,8 @@ void StartGpsTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	//gps();
-    osDelay(20);
+	gps();
+    //osDelay(5);
   }
   /* USER CODE END StartGpsTask */
 }
