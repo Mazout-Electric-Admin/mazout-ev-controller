@@ -112,6 +112,7 @@ uint8_t propertyIndex = 0;
 uint8_t c_type = 0;
 char *gpsString;
 char extractedData[32] = {0};
+uint16_t ctr = 0;
 
 typedef enum {
     IMMOBILIZE_STATUS = 0x01,
@@ -139,7 +140,7 @@ typedef struct {
     uint8_t device_temp[1];      // 1 byte
     uint8_t motor_temp[1];
     uint8_t torque[1];
-    uint8_t soc[1];
+    uint8_t soc[2];
     uint8_t throttle[2];
     uint8_t networkStrength[1];  // 1 byte
 } serverProperties;
@@ -245,16 +246,17 @@ Error_Handler();
   //serverAttributes.immobilizeStatus[0] = 0x01;
   //serverAttributes.rpmPreset[0] = 0x64;
   memset(serverAttributes.gpsData, 0x00, sizeof(serverAttributes.gpsData));
-  serverAttributes.currentData[0] = 0x12;
-  serverAttributes.currentData[1] = 0x34;
-  serverAttributes.voltageData[0] = 0x56;
-  serverAttributes.voltageData[1] = 0x78;
-  serverAttributes.rpm[0] = 0x01;
-  serverAttributes.rpm[1] = 0xF4;
+  serverAttributes.currentData[0] = 0x00;
+  serverAttributes.currentData[1] = 0x01;
+  serverAttributes.voltageData[0] = 0x12;
+  serverAttributes.voltageData[1] = 0x11;
+  serverAttributes.rpm[0] = 0x00;
+  serverAttributes.rpm[1] = 0x01;
   serverAttributes.motor_temp[0] = 0x20;
   serverAttributes.device_temp[0] = 0x20;
   serverAttributes.networkStrength[0] = 0x05;
-  serverAttributes.soc[0] = 0x63;
+  serverAttributes.soc[0] = 0x99;
+  serverAttributes.soc[0] = 0x78;
   serverAttributes.torque[0] = 0x00;
   serverAttributes.throttle[0] = 0x01;
   serverAttributes.throttle[1] = 0x05;
@@ -625,6 +627,8 @@ void NetworkInit() {
     HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
     //HAL_UART_Receive_DMA(&huart1, (uint8_t *)rxBuffer, 256);
 
+    //osDelay(100);
+
     // Check network registration
     strcpy(txBuffer, "AT+CREG=2\r\n");
     HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
@@ -632,6 +636,8 @@ void NetworkInit() {
 
     memset(rxBuffer, '\0' , sizeof(rxBuffer));
     HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
+
+    //osDelay(100);
 
     // Check network registration
 	strcpy(txBuffer, "AT+CGREG=0\r\n");
@@ -641,6 +647,8 @@ void NetworkInit() {
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+	//osDelay(100);
+
     // Set APN
     strcpy(txBuffer, "AT+QICSGP=1,1,\"airtelgprs.com\","","",0\r\n");
     HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
@@ -648,6 +656,8 @@ void NetworkInit() {
 
     memset(rxBuffer, '\0' , sizeof(rxBuffer));
     HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
+
+    //osDelay(100);
 
     // PDP Contextn
     strcpy(txBuffer, "AT+QIACT=1\r\n");
@@ -657,6 +667,9 @@ void NetworkInit() {
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+	//osDelay(100);
+
+
 	// Set GPS Mode
 	strcpy(txBuffer, "AT+QGPSCFG=\"outport\",\"uart1\"\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
@@ -665,13 +678,17 @@ void NetworkInit() {
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+	//osDelay(100);
+
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"gnssconfig\",3\r\n");//3
+	strcpy(txBuffer, "AT+QGPSCFG=\"gnssconfig\",0\r\n");//3
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
+
+	//osDelay(100);
 
 	// Set GPS Mode
 	strcpy(txBuffer, "AT+QGPSCFG=\"autogps\",0\r\n");
@@ -681,6 +698,8 @@ void NetworkInit() {
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+	//osDelay(100);
+
 	// Set GPS Mode
 	strcpy(txBuffer, "AT+QGPSCFG=\"gpsnmeatype\",0\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
@@ -688,6 +707,8 @@ void NetworkInit() {
 
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
+
+	//osDelay(100);
 
 	// Set GPS Mode
 	strcpy(txBuffer, "AT+QGPSCFG=\"glonassnmeatype\",0\r\n");
@@ -697,6 +718,8 @@ void NetworkInit() {
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+	//osDelay(100);
+
 	// Set GPS Mode
 	strcpy(txBuffer, "AT+QGPSCFG=\"galileonmeatype\",0\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
@@ -704,6 +727,8 @@ void NetworkInit() {
 
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
+
+	//osDelay(100);
 
 	// Set GPS Mode
 	strcpy(txBuffer, "AT+QGPSCFG=\"beidounmeatype\",0\r\n");
@@ -713,6 +738,8 @@ void NetworkInit() {
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+	//osDelay(100);
+
 	// Set GPS Mode
 	strcpy(txBuffer, "AT+QGPSCFG=\"beidounmeaformat\",0\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
@@ -721,13 +748,17 @@ void NetworkInit() {
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+	//osDelay(100);
+
 	// Set GPS Mode
-	strcpy(txBuffer, "AT+QGPSCFG=\"gnssnmeatype\",2\r\n");//1
+	strcpy(txBuffer, "AT+QGPSCFG=\"gnssnmeatype\",0\r\n");//2
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 	memset(txBuffer, '\0' , sizeof(txBuffer));
 
 	memset(rxBuffer, '\0' , sizeof(rxBuffer));
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
+
+	//osDelay(100);
 
     // Start TCP/IP service
     strcpy(txBuffer, "ATV=1\r\n");
@@ -737,6 +768,7 @@ void NetworkInit() {
     memset(rxBuffer, '\0' , sizeof(rxBuffer));
     HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
+    //osDelay(100);
 
     // Check response
     if (strstr(rxBuffer, "+NETOPEN: 0") == NULL) {
@@ -772,14 +804,15 @@ void device_config(int type)
 	{
 	  serverAttributes.currentData[0] = 0x01;
 	  serverAttributes.currentData[1] = 0x34;
-	  serverAttributes.voltageData[0] = 0x30;
-	  serverAttributes.voltageData[1] = 0x12;
-	  serverAttributes.rpm[0] = 0x1;
-	  serverAttributes.rpm[1] = 0xF4;
+	  serverAttributes.voltageData[0] = 0x99;
+	  serverAttributes.voltageData[1] = 0x99;
+	  serverAttributes.rpm[0] = 0x10;
+	  serverAttributes.rpm[1] = 0x41;
 	  serverAttributes.motor_temp[0] = 0x20;
 	  serverAttributes.device_temp[0] = 0x20;
-	  serverAttributes.networkStrength[0] = 0x0d;
-	  serverAttributes.soc[0] = 0x54;
+	  serverAttributes.networkStrength[0] = 0x10;
+	  serverAttributes.soc[0] = 0x84;
+	  serverAttributes.soc[1] = 0x29;
 	  serverAttributes.torque[0] = 0x50;
 	  serverAttributes.throttle[0] = 0x03;
 	  serverAttributes.throttle[1] = 0x08;
@@ -788,14 +821,15 @@ void device_config(int type)
 	{
 	  serverAttributes.currentData[0] = 0x03;
 	  serverAttributes.currentData[1] = 0x55;
-	  serverAttributes.voltageData[0] = 0x28;
-	  serverAttributes.voltageData[1] = 0x39;
-	  serverAttributes.rpm[0] = 0x8;
-	  serverAttributes.rpm[1] = 0xE8;
+	  serverAttributes.voltageData[0] = 0x50;
+	  serverAttributes.voltageData[1] = 0x01;
+	  serverAttributes.rpm[0] = 0x29;
+	  serverAttributes.rpm[1] = 0x88;
 	  serverAttributes.motor_temp[0] = 0x21;
 	  serverAttributes.device_temp[0] = 0x21;
-	  serverAttributes.networkStrength[0] = 0x0f;
-	  serverAttributes.soc[0] = 0x4E;
+	  serverAttributes.networkStrength[0] = 0x16;
+	  serverAttributes.soc[0] = 0x78;
+	  serverAttributes.soc[1] = 0x45;
 	  serverAttributes.torque[0] = 0x64;
 	  serverAttributes.throttle[0] = 0x04;
 	  serverAttributes.throttle[1] = 0x02;
@@ -857,41 +891,112 @@ void SocketReceiveData(void) {
 
 void gps(void) {
 
+    osMutexAcquire(uart_lockHandle, osWaitForever);
 
-	osMutexAcquire(uart_lockHandle, osWaitForever);
+/*
+    // Start GPS session
+    strcpy(txBuffer, "AT+QGPS=1\r\n");
+    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+    memset(txBuffer, '\0', sizeof(txBuffer));
 
-	strcpy(txBuffer, "AT+QGPS=1\r\n");
+    osDelay(100);
+*/
+    strcpy(txBuffer, "AT+QGPS=1\r\n");
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-	memset(txBuffer, '\0' , sizeof(txBuffer));
-
-	strcpy(txBuffer, "AT+QGPSLOC=2\r\n");
+	//memset(txBuffer, '\0', sizeof(txBuffer));
 
 	while (1) {
-		// Transmit the location request
 		HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-		//osDelay(5); // Wait for the response
-
-		// Check if the response contains "GNGGA"
-		gpsString = strstr((char *)checkBuffer, "GNRMC");
-		if (gpsString != NULL) break;
+		gpsString = strstr((char *)checkBuffer, "OK");
+		if (gpsString != NULL){
+			strcpy(txBuffer, "AT+QGPS?\r\n");
+			HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+			gpsString = strstr((char *)checkBuffer, "+QGPS:");
+			if (gpsString != NULL){
+				break;
+			}
+		}
+		//if ((ctr ^ 1) == (ctr + 1))
+		if (ctr == 100) {
+			goto cleanup;
+		}
+		++ctr;
+		//osDelay(200);
 	}
+	ctr = 0;
 
-	gpsString = strstr(gpsString, "GNRMC");
-	gpsString = strstr(gpsString, "A");
-	gpsString = strstr(gpsString, ",");
-	//gpsString += 2;
-	strncpy(extractedData, gpsString, 28);
-	extractedData[32] = '\0';
+    strcpy(txBuffer, "AT+QGPSLOC=2\r\n");
+    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
 
-	memset(txBuffer, '\0' , sizeof(txBuffer));
+    while (ctr < 100) {
+        gpsString = strstr((char *)checkBuffer, "+QGPSLOC:");
+        if (gpsString != NULL){
+        	break;
+        }
+        //if ((ctr ^ 1) == (ctr + 1))
+        	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+        //if (ctr == 100) {
+			//goto cleanup;
+       // }
+        ++ctr;
+        //osDelay(200);
+    }
 
-	memcpy(serverAttributes.gpsData, extractedData, strlen(extractedData));
+    memset(txBuffer, '\0', sizeof(txBuffer));
 
-	strcpy(txBuffer, "AT+QGPSEND\r\n");
-	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-	memset(txBuffer, '\0' , sizeof(txBuffer));
+    // Check for "GNRMC" in the response
+    gpsString = strstr(gpsString, ".");
+    if (gpsString == NULL) {
+        goto cleanup;
+    }
+/*
+    // Check for "A" in the response
+    gpsString = strstr(gpsString, "A");
+    if (gpsString == NULL) {
+        goto cleanup;
+    }
+*/
+    // Check for the first comma
+    gpsString = strstr(gpsString, ",");
+    if (gpsString == NULL) {
+        goto cleanup;
+    }
 
-	osMutexRelease(uart_lockHandle);
+    // Extract data
+    strncpy(extractedData, gpsString, 18);
+    extractedData[19] = '\0'; // Ensure null termination
+
+    // Remove the first comma
+    char *comma = strchr(extractedData, ',');
+    if (comma != NULL) {
+        memmove(comma, comma + 1, strlen(comma)); // Shift the characters left
+    }
+
+    // Copy data to server attributes
+    memcpy(serverAttributes.gpsData, extractedData, strlen(extractedData));
+
+    // End GPS session
+    strcpy(txBuffer, "AT+QGPSEND\r\n");
+    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+    memset(txBuffer, '\0', sizeof(txBuffer));
+
+    // Release mutex and exit
+    osMutexRelease(uart_lockHandle);
+    ctr = 0;
+    propertyIndex = 0;
+    return;
+
+cleanup:
+    // End GPS session in case of invalid data
+    strcpy(txBuffer, "AT+QGPSEND\r\n");
+    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+    memset(txBuffer, '\0', sizeof(txBuffer));
+
+    // Release mutex before exiting
+    osMutexRelease(uart_lockHandle);
+    ctr = 0;
+    propertyIndex = 0;
+    return;
 }
 
 void HandleReceivedData(uint8_t writeIndex) {
@@ -1101,8 +1206,8 @@ void StartSendTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  //SocketSendData();
-	  osDelay(1);
+	  SocketSendData();
+	  //osDelay(1);
   }
   /* USER CODE END StartSendTask */
 }
@@ -1140,7 +1245,7 @@ void StartGpsTask(void *argument)
   for(;;)
   {
 	gps();
-    //osDelay(5);
+    osDelay(10000);
   }
   /* USER CODE END StartGpsTask */
 }
