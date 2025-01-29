@@ -113,6 +113,7 @@ uint8_t c_type = 0;
 char *gpsString;
 char extractedData[32] = {0};
 uint16_t ctr = 0;
+uint8_t gps_start = 0;
 
 typedef enum {
     IMMOBILIZE_STATUS = 0x01,
@@ -759,6 +760,10 @@ void NetworkInit() {
 	HAL_UART_Receive(&huart1, (uint8_t *)rxBuffer, sizeof(rxBuffer), UART_TIMEOUT);
 
 	//osDelay(100);
+	// Start GPS session
+	strcpy(txBuffer, "AT+QGPS=1\r\n");
+	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+	memset(txBuffer, '\0', sizeof(txBuffer));
 
     // Start TCP/IP service
     strcpy(txBuffer, "ATV=1\r\n");
@@ -789,7 +794,7 @@ void OpenSocket() {
 
     //memset(txBuffer, '\0' , sizeof(txBuffer));
     // Check response
-    if (strstr(rxBuffer, "+CIPOPEN: 0,0") == NULL) {
+    if (strstr(rxBuffer, "+QIPOPEN: 0,0") == NULL) {
         //Error_Handler();
     }
     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t *)rxBuffer, RX_BUFFER_SIZE);
@@ -880,6 +885,7 @@ void SocketReceiveData(void) {
 
     HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
     memset(txBuffer, '\0' , sizeof(txBuffer));
+    //osDelay(5);
 
     osMutexRelease(uart_lockHandle);
 
@@ -891,56 +897,81 @@ void SocketReceiveData(void) {
 
 void gps(void) {
 
+	uint8_t set = 0;
     osMutexAcquire(uart_lockHandle, osWaitForever);
 
-/*
-    // Start GPS session
-    strcpy(txBuffer, "AT+QGPS=1\r\n");
-    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-    memset(txBuffer, '\0', sizeof(txBuffer));
 
-    osDelay(100);
-*/
-    strcpy(txBuffer, "AT+QGPS=1\r\n");
+	strcpy(txBuffer, "AT+QGPS?\r\n");
+	//osDelay(2000);
 	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-	//memset(txBuffer, '\0', sizeof(txBuffer));
+	osDelay(100);
+	gpsString = strstr((char *)checkBuffer, "+QGPS: 1");
+	if (gpsString != NULL){
+		set = 1;
+	}
 
 	while (1) {
-		HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-		gpsString = strstr((char *)checkBuffer, "OK");
-		if (gpsString != NULL){
+		if (set == 0)
+		{
+			memset(txBuffer, '\0', sizeof(txBuffer));
 			strcpy(txBuffer, "AT+QGPS?\r\n");
 			HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-			gpsString = strstr((char *)checkBuffer, "+QGPS:");
+			osDelay(100);
+			gpsString = strstr((char *)checkBuffer, "+QGPS: 1");
+			if (gpsString != NULL){
+				set = 1;
+				osDelay(6000);
+				memset(txBuffer, '\0', sizeof(txBuffer));
+				strcpy(txBuffer, "AT+QGPSLOC=2\r\n");
+				HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+				osDelay(100);
+				gpsString = strstr((char *)rxBuffer, "+QGPSLOC:");
+				if (gpsString != NULL){
+				}
+			}
+			osDelay(100);
+			gpsString = strstr((char *)checkBuffer, "+CME ERROR: 504");
+			if (gpsString != NULL){
+				set = 1;
+			}
+		}
+		else if (set == 1) {
+
+			memset(txBuffer, '\0', sizeof(txBuffer));
+			strcpy(txBuffer, "AT+QGPSLOC=2\r\n");
+			HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+			osDelay(100);
+			gpsString = strstr((char *)rxBuffer, "+QGPSLOC:");
 			if (gpsString != NULL){
 				break;
 			}
+
 		}
-		//if ((ctr ^ 1) == (ctr + 1))
-		if (ctr == 100) {
+		if (ctr == 100 && gps_start == 0) {
 			goto cleanup;
 		}
-		++ctr;
-		//osDelay(200);
+		else if (ctr == 2 && gps_start == 1){
+			goto cleanup;
+		}
+		osDelay(100);
+		gpsString = strstr((char *)checkBuffer, "+CME ERROR: 516");
+		if (gpsString != NULL){
+			memset(txBuffer, '\0', sizeof(txBuffer));
+			strcpy(txBuffer, "AT+QGPS?\r\n");
+			HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+			osDelay(100);
+			gpsString = strstr((char *)checkBuffer, "+QGPS: 1");
+			if (gpsString != NULL && gps_start == 0){
+				++ctr;
+				osDelay(6000);
+			}
+			else if (gpsString != NULL && gps_start == 1){
+				++ctr;
+			}
+			gpsString = strstr((char *)checkBuffer, "+QGPS: 0");
+			if (gpsString != NULL)	goto cleanup;
+		}
 	}
-	ctr = 0;
-
-    strcpy(txBuffer, "AT+QGPSLOC=2\r\n");
-    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-
-    while (ctr < 100) {
-        gpsString = strstr((char *)checkBuffer, "+QGPSLOC:");
-        if (gpsString != NULL){
-        	break;
-        }
-        //if ((ctr ^ 1) == (ctr + 1))
-        	HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-        //if (ctr == 100) {
-			//goto cleanup;
-       // }
-        ++ctr;
-        //osDelay(200);
-    }
 
     memset(txBuffer, '\0', sizeof(txBuffer));
 
@@ -949,13 +980,7 @@ void gps(void) {
     if (gpsString == NULL) {
         goto cleanup;
     }
-/*
-    // Check for "A" in the response
-    gpsString = strstr(gpsString, "A");
-    if (gpsString == NULL) {
-        goto cleanup;
-    }
-*/
+
     // Check for the first comma
     gpsString = strstr(gpsString, ",");
     if (gpsString == NULL) {
@@ -976,21 +1001,22 @@ void gps(void) {
     memcpy(serverAttributes.gpsData, extractedData, strlen(extractedData));
 
     // End GPS session
-    strcpy(txBuffer, "AT+QGPSEND\r\n");
-    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-    memset(txBuffer, '\0', sizeof(txBuffer));
+    //strcpy(txBuffer, "AT+QGPSEND\r\n");
+    //HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+    //memset(txBuffer, '\0', sizeof(txBuffer));
 
     // Release mutex and exit
     osMutexRelease(uart_lockHandle);
     ctr = 0;
     propertyIndex = 0;
+    gps_start = 1;
     return;
 
 cleanup:
     // End GPS session in case of invalid data
-    strcpy(txBuffer, "AT+QGPSEND\r\n");
-    HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
-    memset(txBuffer, '\0', sizeof(txBuffer));
+    //strcpy(txBuffer, "AT+QGPSEND\r\n");
+    //HAL_UART_Transmit(&huart1, (uint8_t *)txBuffer, strlen(txBuffer), UART_TIMEOUT);
+    //memset(txBuffer, '\0', sizeof(txBuffer));
 
     // Release mutex before exiting
     osMutexRelease(uart_lockHandle);
@@ -1245,7 +1271,7 @@ void StartGpsTask(void *argument)
   for(;;)
   {
 	gps();
-    osDelay(10000);
+    osDelay(5000);
   }
   /* USER CODE END StartGpsTask */
 }
