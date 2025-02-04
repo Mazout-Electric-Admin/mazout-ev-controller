@@ -1,0 +1,6 @@
+C:/TouchGFXProjects/MyApplication_8/CM4/Core/Src/stm32h7xx_hal_msp.c:68:6:HAL_MspInit	16	static
+C:/TouchGFXProjects/MyApplication_8/CM4/Core/Src/stm32h7xx_hal_msp.c:92:6:HAL_TIM_Base_MspInit	24	static
+C:/TouchGFXProjects/MyApplication_8/CM4/Core/Src/stm32h7xx_hal_msp.c:122:6:HAL_TIM_MspPostInit	48	static
+C:/TouchGFXProjects/MyApplication_8/CM4/Core/Src/stm32h7xx_hal_msp.c:167:6:HAL_TIM_Base_MspDeInit	16	static
+C:/TouchGFXProjects/MyApplication_8/CM4/Core/Src/stm32h7xx_hal_msp.c:203:6:HAL_UART_MspInit	248	static
+C:/TouchGFXProjects/MyApplication_8/CM4/Core/Src/stm32h7xx_hal_msp.c:273:6:HAL_UART_MspDeInit	16	static

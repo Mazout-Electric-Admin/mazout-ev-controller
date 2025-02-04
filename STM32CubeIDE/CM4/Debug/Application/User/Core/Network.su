@@ -1,0 +1,5 @@
+../Application/User/Core/Network.c:27:6:NetworkInit	32	static
+../Application/User/Core/Network.c:252:6:OpenSocket	24	static
+../Application/User/Core/Network.c:277:6:device_config	16	static
+../Application/User/Core/Network.c:333:6:SocketSendData	56	static
+../Application/User/Core/Network.c:392:6:SocketReceiveData	16	static

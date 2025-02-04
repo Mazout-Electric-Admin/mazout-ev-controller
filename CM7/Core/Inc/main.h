@@ -7,12 +7,13 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
+  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.</center></h2>
   *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
+  * This software component is licensed by ST under Ultimate Liberty license
+  * SLA0044, the "License"; You may not use this file except in compliance with
+  * the License. You may obtain a copy of the License at:
+  *                             www.st.com/SLA0044
   *
   ******************************************************************************
   */
@@ -28,12 +29,15 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32h7xx_hal.h"
-#include "stm32h7xx_nucleo.h"
-#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stm32h747i_discovery_qspi.h"
+#include "stm32h747i_discovery_sdram.h"
+#include "stm32h747i_discovery_bus.h"
+#include "stm32h747i_discovery_errno.h"
+#include "../Components/otm8009a/otm8009a.h"
+//#include <TouchGFXGeneratedHAL.hpp>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -51,19 +55,26 @@ extern "C" {
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+extern int32_t DSI_IO_Write(uint16_t ChannelNbr, uint16_t Reg, uint8_t *pData, uint16_t Size);
+extern int32_t DSI_IO_Read(uint16_t ChannelNbr, uint16_t Reg, uint8_t *pData, uint16_t Size);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LCD_BL_Pin GPIO_PIN_12
+#define LCD_BL_GPIO_Port GPIOJ
+#define LCD_RESET_Pin GPIO_PIN_3
+#define LCD_RESET_GPIO_Port GPIOG
+#define MCU_ACTIVE_Pin GPIO_PIN_8
+#define MCU_ACTIVE_GPIO_Port GPIOF
+#define VSYNC_FREQ_Pin GPIO_PIN_3
+#define VSYNC_FREQ_GPIO_Port GPIOJ
 
 /* USER CODE BEGIN Private defines */
-
+//int RPM = 0;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

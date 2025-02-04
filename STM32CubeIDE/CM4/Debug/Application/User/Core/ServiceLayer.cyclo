@@ -1,0 +1,4 @@
+../Application/User/Core/ServiceLayer.c:26:6:HAL_UARTEx_RxEventCallback	1
+../Application/User/Core/ServiceLayer.c:35:6:HandleReceivedData	6
+../Application/User/Core/ServiceLayer.c:61:9:encodeServerData	14
+../Application/User/Core/ServiceLayer.c:141:6:decodeServerData	17
